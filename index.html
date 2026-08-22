@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Service Access</title>
+<style>
+  :root { --bg:#0b0b12; --card:#151521; --accent:#7c5cff; --text:#eee; --muted:#9a9aab; --danger:#ff5c5c; }
+  * { box-sizing: border-box; }
+  body {
+    margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+    background:var(--bg); color:var(--text); font-family: 'Segoe UI', system-ui, sans-serif;
+    padding: 20px;
+  }
+  .card {
+    background:var(--card); border:1px solid #232336; border-radius:16px;
+    padding:36px 32px; max-width:400px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,.4);
+  }
+  h1 { font-size:20px; margin:0 0 6px; }
+  p.sub { color:var(--muted); font-size:14px; margin:0 0 24px; }
+  input {
+    width:100%; padding:14px 16px; border-radius:10px; border:1px solid #2a2a3d;
+    background:#0f0f18; color:var(--text); font-size:15px; letter-spacing:1px;
+    text-transform:uppercase; margin-bottom:14px;
+  }
+  input:focus { outline:none; border-color:var(--accent); }
+  button {
+    width:100%; padding:14px; border:none; border-radius:10px; background:var(--accent);
+    color:white; font-weight:600; font-size:15px; cursor:pointer; transition:opacity .15s;
+  }
+  button:hover { opacity:.9; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .msg { margin-top:14px; font-size:14px; text-align:center; min-height:20px; }
+  .msg.error { color:var(--danger); }
+  .msg.ok { color:#5cff9d; }
+  #service { display:none; }
+  .timer {
+    text-align:center; font-size:32px; font-weight:700; margin:18px 0 6px; letter-spacing:1px;
+  }
+  .timer-label { text-align:center; color:var(--muted); font-size:13px; margin-bottom:20px; }
+  .service-box {
+    background:#0f0f18; border:1px dashed #2a2a3d; border-radius:12px; padding:24px; text-align:center; color:var(--muted);
+  }
+</style>
+</head>
+<body>
+
+<div class="card" id="gate">
+  <h1>🔐 Access Key Required</h1>
+  <p class="sub">Apni license key daalo. Roz 2 ghante free access milta hai.</p>
+  <input id="keyInput" placeholder="XXXX-XXXX-XXXX" maxlength="14" autocomplete="off">
+  <button id="unlockBtn" onclick="unlock()">Unlock</button>
+  <div class="msg" id="msg"></div>
+</div>
+
+<div class="card" id="service">
+  <h1>✅ Access Granted</h1>
+  <div class="timer" id="timerDisplay">00:00</div>
+  <div class="timer-label">Aaj ka baaki hua time</div>
+  <div class="service-box">
+    Yahan par tumhari actual service/content aayega —
+    (video, tool, download link, ya jo bhi tum unlock karwana chahte ho).
+  </div>
+</div>
+
+<script>
+const FUNCTIONS_BASE = '/.netlify/functions';
+let currentKey = null;
+let remainingSeconds = 0;
+let tickTimer = null;
+let heartbeatTimer = null;
+
+async function unlock() {
+  const input = document.getElementById('keyInput');
+  const btn = document.getElementById('unlockBtn');
+  const msg = document.getElementById('msg');
+  const key = input.value.trim().toUpperCase();
+
+  if (!key) { showMsg('Key daalo pehle', true); return; }
+
+  btn.disabled = true;
+  showMsg('Checking...', false);
+
+  try {
+    const res = await fetch(`${FUNCTIONS_BASE}/verify-key`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key })
+    });
+    const data = await res.json();
+
+    if (!data.ok) {
+      showMsg(reasonText(data.reason), true);
+      btn.disabled = false;
+      return;
+    }
+
+    currentKey = key;
+    remainingSeconds = data.remainingSeconds;
+    document.getElementById('gate').style.display = 'none';
+    document.getElementById('service').style.display = 'block';
+    startTimer();
+    startHeartbeat();
+  } catch (e) {
+    showMsg('Network error, dobara try karo', true);
+    btn.disabled = false;
+  }
+}
+
+function reasonText(reason) {
+  switch (reason) {
+    case 'invalid_key': return 'Ye key valid nahi hai';
+    case 'blocked': return 'Ye key block ho chuki hai';
+    case 'daily_limit_reached': return 'Aaj ka 2 ghante ka limit khatam ho gaya, kal try karo';
+    default: return 'Kuch galat ho gaya';
+  }
+}
+
+function showMsg(text, isError) {
+  const msg = document.getElementById('msg');
+  msg.textContent = text;
+  msg.className = 'msg ' + (isError ? 'error' : 'ok');
+}
+
+function startTimer() {
+  updateTimerDisplay();
+  tickTimer = setInterval(() => {
+    remainingSeconds = Math.max(0, remainingSeconds - 1);
+    updateTimerDisplay();
+    if (remainingSeconds <= 0) lockOut('Time khatam ho gaya');
+  }, 1000);
+}
+
+function updateTimerDisplay() {
+  const m = Math.floor(remainingSeconds / 60).toString().padStart(2, '0');
+  const s = Math.floor(remainingSeconds % 60).toString().padStart(2, '0');
+  document.getElementById('timerDisplay').textContent = `${m}:${s}`;
+}
+
+function startHeartbeat() {
+  // Every 20s, tell the server how much time has passed (server is source of truth)
+  heartbeatTimer = setInterval(async () => {
+    try {
+      const res = await fetch(`${FUNCTIONS_BASE}/heartbeat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: currentKey })
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        lockOut(reasonText(data.reason));
+        return;
+      }
+      // Sync local countdown with server's authoritative value
+      remainingSeconds = data.remainingSeconds;
+    } catch (e) {
+      // ignore transient network errors, local timer keeps counting
+    }
+  }, 20000);
+}
+
+function lockOut(reason) {
+  clearInterval(tickTimer);
+  clearInterval(heartbeatTimer);
+  document.getElementById('service').style.display = 'none';
+  document.getElementById('gate').style.display = 'block';
+  document.getElementById('unlockBtn').disabled = false;
+  document.getElementById('keyInput').value = '';
+  showMsg(reason, true);
+}
+</script>
+</body>
+</html>

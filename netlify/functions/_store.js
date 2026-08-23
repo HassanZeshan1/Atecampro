@@ -1,7 +1,11 @@
 const { getStore } = require('@netlify/blobs');
 
 function store() {
-  return getStore('license-keys');
+  return getStore({
+    name: 'license-keys',
+    siteID: process.env.BLOBS_SITE_ID,
+    token: process.env.BLOBS_TOKEN,
+  });
 }
 
 function todayKey() {

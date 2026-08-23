@@ -18,19 +18,23 @@ exports.handler = async (event) => {
   const db = store();
   const record = await db.get(key, { type: 'json' });
 
+  // Key nahi mili
   if (!record) {
-    return { statusCode: 200, body: JSON.stringify({ ok: false, reason: 'invalid_key' }) };
+    return { statusCode: 401, body: JSON.stringify({ ok: false, reason: 'invalid_key' }) };
   }
+  
+  // Key Blocked hai
   if (record.blocked) {
-    return { statusCode: 200, body: JSON.stringify({ ok: false, reason: 'blocked' }) };
+    return { statusCode: 403, body: JSON.stringify({ ok: false, reason: 'blocked' }) };
   }
 
   const today = todayKey();
   const usageToday = record.usage[today] || { secondsUsed: 0, lastHeartbeat: null };
   const remaining = record.dailyLimitSeconds - usageToday.secondsUsed;
 
+  // Daily limit over
   if (remaining <= 0) {
-    return { statusCode: 200, body: JSON.stringify({ ok: false, reason: 'daily_limit_reached' }) };
+    return { statusCode: 403, body: JSON.stringify({ ok: false, reason: 'daily_limit_reached' }) };
   }
 
   usageToday.lastHeartbeat = Date.now();
@@ -39,6 +43,10 @@ exports.handler = async (event) => {
 
   return {
     statusCode: 200,
-    body: JSON.stringify({ ok: true, remainingSeconds: remaining, dailyLimitSeconds: record.dailyLimitSeconds }),
+    body: JSON.stringify({ 
+      ok: true, 
+      remainingSeconds: remaining, 
+      dailyLimitSeconds: record.dailyLimitSeconds 
+    }),
   };
 };

@@ -11,6 +11,8 @@ exports.handler = async (event) => {
   } catch (e) {}
 
   const key = (body.key || '').toString().trim().toUpperCase();
+  const deviceId = (body.deviceId || '').toString().trim().slice(0, 128);
+
   if (!key) {
     return { statusCode: 400, body: JSON.stringify({ ok: false, reason: 'Key required' }) };
   }
@@ -18,23 +20,36 @@ exports.handler = async (event) => {
   const db = store();
   const record = await db.get(key, { type: 'json' });
 
-  // Key nahi mili
   if (!record) {
-    return { statusCode: 401, body: JSON.stringify({ ok: false, reason: 'invalid_key' }) };
+    return { statusCode: 200, body: JSON.stringify({ ok: false, reason: 'invalid_key' }) };
   }
-  
-  // Key Blocked hai
   if (record.blocked) {
-    return { statusCode: 403, body: JSON.stringify({ ok: false, reason: 'blocked' }) };
+    return { statusCode: 200, body: JSON.stringify({ ok: false, reason: 'blocked' }) };
+  }
+
+  // --- Device tracking ---
+  if (deviceId) {
+    if (!record.deviceIds) record.deviceIds = [];
+    const maxDevices = record.maxDevices || 1;
+
+    if (!record.deviceIds.includes(deviceId)) {
+      if (record.deviceIds.length >= maxDevices) {
+        // Extra device: allow through, but flag for admin
+        record.flagged = true;
+        record.extraDeviceAttempt = { deviceId, at: Date.now() };
+      } else {
+        record.deviceIds.push(deviceId);
+      }
+    }
   }
 
   const today = todayKey();
   const usageToday = record.usage[today] || { secondsUsed: 0, lastHeartbeat: null };
   const remaining = record.dailyLimitSeconds - usageToday.secondsUsed;
 
-  // Daily limit over
   if (remaining <= 0) {
-    return { statusCode: 403, body: JSON.stringify({ ok: false, reason: 'daily_limit_reached' }) };
+    await db.setJSON(key, record); // save device tracking even if quota is over
+    return { statusCode: 200, body: JSON.stringify({ ok: false, reason: 'daily_limit_reached' }) };
   }
 
   usageToday.lastHeartbeat = Date.now();
@@ -43,10 +58,6 @@ exports.handler = async (event) => {
 
   return {
     statusCode: 200,
-    body: JSON.stringify({ 
-      ok: true, 
-      remainingSeconds: remaining, 
-      dailyLimitSeconds: record.dailyLimitSeconds 
-    }),
+    body: JSON.stringify({ ok: true, remainingSeconds: remaining, dailyLimitSeconds: record.dailyLimitSeconds }),
   };
 };

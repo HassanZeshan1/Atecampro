@@ -22,7 +22,7 @@
   table { width:100%; border-collapse:collapse; font-size:13px; }
   th, td { text-align:left; padding:10px 8px; border-bottom:1px solid #232336; }
   th { color:var(--muted); font-weight:500; }
-  .badge { padding:3px 8px; border-radius:6px; font-size:11px; font-weight:600; }
+  .badge { padding:3px 8px; border-radius:6px; font-size:11px; font-weight:600; display:inline-block; }
   .badge.active { background:rgba(92,255,157,.15); color:var(--ok); }
   .badge.blocked { background:rgba(255,92,92,.15); color:var(--danger); }
   .key-mono { font-family:monospace; letter-spacing:.5px; }
@@ -46,9 +46,13 @@
         <label for="label">Label (optional, e.g. "Rehan ke liye")</label>
         <input id="label" placeholder="optional note">
       </div>
-      <div style="width:160px">
+      <div style="width:120px">
         <label for="hours">Daily limit (hours)</label>
         <input id="hours" type="number" value="2" min="0.1" step="0.1">
+      </div>
+      <div style="width:110px">
+        <label for="maxDevices">Max devices</label>
+        <input id="maxDevices" type="number" value="1" min="1" step="1">
       </div>
     </div>
     <button onclick="generateKey()">+ Generate New Key</button>
@@ -62,7 +66,7 @@
     </div>
     <table>
       <thead>
-        <tr><th>Key</th><th>Label</th><th>Status</th><th>Today's usage</th><th>Action</th></tr>
+        <tr><th>Key</th><th>Label</th><th>Status</th><th>Devices</th><th>Today's usage</th><th>Action</th></tr>
       </thead>
       <tbody id="keysBody"></tbody>
     </table>
@@ -87,6 +91,7 @@ async function generateKey() {
   const genMsg = document.getElementById('genMsg');
   const label = document.getElementById('label').value.trim();
   const hours = parseFloat(document.getElementById('hours').value) || 2;
+  const maxDevices = parseInt(document.getElementById('maxDevices').value) || 1;
 
   genMsg.className = 'msg';
   genMsg.textContent = 'Generating...';
@@ -95,7 +100,7 @@ async function generateKey() {
     const res = await fetch(`${FUNCTIONS_BASE}/generate-key`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-admin-secret': secret() },
-      body: JSON.stringify({ label, dailyLimitSeconds: Math.round(hours * 3600) })
+      body: JSON.stringify({ label, dailyLimitSeconds: Math.round(hours * 3600), maxDevices })
     });
     const data = await res.json();
     if (!res.ok || !data.ok) {
@@ -135,13 +140,18 @@ async function loadKeys() {
       <tr>
         <td class="key-mono">${k.key}</td>
         <td>${k.label || '—'}</td>
-        <td><span class="badge ${k.blocked ? 'blocked' : 'active'}">${k.blocked ? 'Blocked' : 'Active'}</span></td>
+        <td>
+          <span class="badge ${k.blocked ? 'blocked' : 'active'}">${k.blocked ? 'Blocked' : 'Active'}</span>
+          ${k.flagged ? '<br><span class="badge blocked">⚠️ Flagged</span>' : ''}
+        </td>
+        <td>${k.deviceCount || 0} / ${k.maxDevices || 1}</td>
         <td>${fmtSeconds(k.usedTodaySeconds)} / ${fmtSeconds(k.dailyLimitSeconds)}</td>
         <td>
           <button class="${k.blocked ? '' : 'danger'}" style="padding:6px 10px;font-size:12px"
             onclick="toggleBlock('${k.key}', ${!k.blocked})">
             ${k.blocked ? 'Unblock' : 'Block'}
           </button>
+          <button class="danger" style="padding:6px 10px;font-size:12px;margin-left:4px" onclick="deleteKey('${k.key}')">Delete</button>
         </td>
       </tr>
     `).join('');
@@ -157,6 +167,19 @@ async function toggleBlock(key, blocked) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-admin-secret': secret() },
       body: JSON.stringify({ key, blocked })
+    });
+    const data = await res.json();
+    if (data.ok) loadKeys();
+  } catch (e) {}
+}
+
+async function deleteKey(key) {
+  if (!confirm(`Pakka delete karna hai key ${key}?`)) return;
+  try {
+    const res = await fetch(`${FUNCTIONS_BASE}/delete-key`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-secret': secret() },
+      body: JSON.stringify({ key })
     });
     const data = await res.json();
     if (data.ok) loadKeys();

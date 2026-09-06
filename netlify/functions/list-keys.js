@@ -23,6 +23,9 @@ exports.handler = async (event) => {
         usedTodaySeconds: usedToday,
         remainingTodaySeconds: Math.max(0, record.dailyLimitSeconds - usedToday),
         createdAt: record.createdAt,
+        maxDevices: record.maxDevices || 1,
+        deviceCount: (record.deviceIds || []).length,
+        flagged: !!record.flagged,
       };
     })
   );

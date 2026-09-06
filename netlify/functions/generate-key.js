@@ -24,6 +24,7 @@ exports.handler = async (event) => {
 
   const dailyLimitSeconds = Number(body.dailyLimitSeconds) || 2 * 60 * 60;
   const label = (body.label || '').toString().slice(0, 80);
+  const maxDevices = Math.max(1, Number(body.maxDevices) || 1);
 
   const key = randomKey();
   const record = {
@@ -32,6 +33,9 @@ exports.handler = async (event) => {
     createdAt: Date.now(),
     blocked: false,
     dailyLimitSeconds,
+    maxDevices,
+    deviceIds: [],
+    flagged: false,
     usage: {},
   };
 
@@ -40,6 +44,6 @@ exports.handler = async (event) => {
 
   return {
     statusCode: 200,
-    body: JSON.stringify({ ok: true, key, dailyLimitSeconds, label }),
+    body: JSON.stringify({ ok: true, key, dailyLimitSeconds, label, maxDevices }),
   };
 };

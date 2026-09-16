@@ -26,6 +26,7 @@ exports.handler = async (event) => {
         maxDevices: record.maxDevices || 1,
         deviceCount: (record.deviceIds || []).length,
         flagged: !!record.flagged,
+        resellerId: record.resellerId || null,
       };
     })
   );

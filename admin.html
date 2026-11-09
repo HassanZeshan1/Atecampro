@@ -185,15 +185,22 @@ async function loadKeys() {
     }
     listMsg.textContent = '';
     body.innerHTML = data.keys.map(k => {
-      // ڈیوائسز کی لسٹ یا ڈیٹیلز ہینڈل کرنے کے لیے
-      let devicesHtml = `<strong>${k.deviceCount || 0}</strong> / ${k.maxDevices || 1}`;
+      // صحیح گنتی اور ڈیوائسز کا ڈیٹا دکھانے کے لیے
+      const currentCount = k.deviceCount !== undefined ? k.deviceCount : (k.devices ? k.devices.length : 0);
+      let devicesHtml = `<strong>${currentCount}</strong> / ${k.maxDevices || 1}`;
       
       const devicesArr = k.devices || k.deviceList || k.connectedDevices;
       if (Array.isArray(devicesArr) && devicesArr.length > 0) {
         devicesHtml += `<div class="device-box">`;
         devicesArr.forEach(dev => {
-          const devName = typeof dev === 'object' ? (dev.name || dev.deviceId || JSON.stringify(dev)) : dev;
-          devicesHtml += `<div class="device-item">💻 ${devName}</div>`;
+          if (typeof dev === 'object' && dev !== null) {
+            const model = dev.model || dev.name || 'Unknown Device';
+            const devId = dev.id || dev.deviceId || '—';
+            const loc = dev.location || 'Not shared';
+            devicesHtml += `<div class="device-item" style="margin-bottom:4px;">💻 <b>${model}</b><br><span style="font-size:10px; color:#a29bfe;">ID: ${devId}</span><br><span style="font-size:10px; color:#5cff9d;">📍 Loc: ${loc}</span></div>`;
+          } else {
+            devicesHtml += `<div class="device-item">💻 ${dev}</div>`;
+          }
         });
         devicesHtml += `</div>`;
       }
@@ -323,7 +330,7 @@ async function loadResellers() {
     `).join('');
   } catch (e) {
     listMsg.className = 'msg error';
-    listMsg.textContent = 'Network error`';
+    listMsg.textContent = 'Network error';
   }
 }
 

@@ -2,8 +2,9 @@ const { store, todayKey } = require('./_store');
 const { authenticateReseller } = require('./_reseller_store');
 
 exports.handler = async (event) => {
-  const reseller = await authenticateReseller(event);
-  if (!reseller) return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) };
+  const auth = await authenticateReseller(event);
+  if (auth.error) return { statusCode: 401, body: JSON.stringify({ error: auth.error }) };
+  const reseller = auth.record;
 
   const db = store();
   const { blobs } = await db.list();
@@ -19,7 +20,11 @@ exports.handler = async (event) => {
         dailyLimitSeconds: record.dailyLimitSeconds, usedTodaySeconds: usedToday,
         remainingTodaySeconds: Math.max(0, record.dailyLimitSeconds - usedToday),
         createdAt: record.createdAt, maxDevices: record.maxDevices || 1,
-        deviceCount: (record.deviceIds || []).length, flagged: !!record.flagged,
+        devices: (record.devices || []).map(d => ({
+          model: d.model || 'Unknown',
+          location: d.location ? `${d.location.lat.toFixed(3)}, ${d.location.lng.toFixed(3)}` : 'Not shared',
+        })),
+        flagged: !!record.flagged,
       };
     })
   );

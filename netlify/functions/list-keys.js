@@ -25,6 +25,7 @@ exports.handler = async (event) => {
         createdAt: record.createdAt,
         maxDevices: record.maxDevices || 1,
         devices: (record.devices || []).map(d => ({
+          id: d.id || '', // <-- Yeh line add kar di hai taake Device ID admin panel par show ho!
           model: d.model || 'Unknown',
           location: d.location ? `${d.location.lat.toFixed(3)}, ${d.location.lng.toFixed(3)}` : 'Not shared',
         })),

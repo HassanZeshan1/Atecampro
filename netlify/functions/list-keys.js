@@ -15,6 +15,7 @@ exports.handler = async (event) => {
       const record = await db.get(b.key, { type: 'json' });
       if (!record) return null;
       const usedToday = record.usage?.[today]?.secondsUsed || 0;
+      const devicesArr = record.devices || [];
       return {
         key: record.key,
         label: record.label || '',
@@ -24,8 +25,9 @@ exports.handler = async (event) => {
         remainingTodaySeconds: Math.max(0, record.dailyLimitSeconds - usedToday),
         createdAt: record.createdAt,
         maxDevices: record.maxDevices || 1,
-        devices: (record.devices || []).map(d => ({
-          id: d.id || '', // <-- Yeh line add kar di hai taake Device ID admin panel par show ho!
+        deviceCount: devicesArr.length, // <--- Yeh yahan add kar diya hai taake sahi gنتی admin panel ko jaye!
+        devices: devicesArr.map(d => ({
+          id: d.id || '',
           model: d.model || 'Unknown',
           location: d.location ? `${d.location.lat.toFixed(3)}, ${d.location.lng.toFixed(3)}` : 'Not shared',
         })),

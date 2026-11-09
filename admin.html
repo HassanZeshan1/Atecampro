@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin — Key Manager</title>
+<title>Admin — Key & Device Manager</title>
 <style>
   :root { --bg:#0b0b12; --card:#151521; --accent:#7c5cff; --text:#eee; --muted:#9a9aab; --danger:#ff5c5c; --ok:#5cff9d; }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; padding:24px; }
-  .wrap { max-width:900px; margin:0 auto; }
+  .wrap { max-width:1050px; margin:0 auto; }
   h1 { font-size:22px; margin-bottom:4px; }
   h2 { font-size:17px; margin-bottom:4px; }
   p.sub { color:var(--muted); margin-top:0; margin-bottom:24px; font-size:14px; }
@@ -21,12 +21,14 @@
   button.danger { background:var(--danger); }
   button:hover { opacity:.9; }
   table { width:100%; border-collapse:collapse; font-size:13px; }
-  th, td { text-align:left; padding:10px 8px; border-bottom:1px solid #232336; }
+  th, td { text-align:left; padding:12px 10px; border-bottom:1px solid #232336; vertical-align: top; }
   th { color:var(--muted); font-weight:500; }
   .badge { padding:3px 8px; border-radius:6px; font-size:11px; font-weight:600; display:inline-block; }
   .badge.active { background:rgba(92,255,157,.15); color:var(--ok); }
   .badge.blocked { background:rgba(255,92,92,.15); color:var(--danger); }
-  .key-mono { font-family:monospace; letter-spacing:.5px; }
+  .key-mono { font-family:monospace; letter-spacing:.5px; color: #a29bfe; font-weight: 600; }
+  .device-box { margin-top: 6px; font-size: 11px; background: #0f0f18; padding: 6px 8px; border-radius: 6px; border: 1px solid #232336; }
+  .device-item { color: var(--muted); margin-bottom: 2px; }
   .msg { font-size:13px; margin-top:8px; min-height:18px; }
   .msg.error { color:var(--danger); }
   .msg.ok { color:var(--ok); }
@@ -36,8 +38,8 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>🛠️ License Key Admin</h1>
-  <p class="sub">Keys generate karo, block/unblock karo, aur usage dekho.</p>
+  <h1>🛠️ License Key & Device Tracking Admin</h1>
+  <p class="sub">Keys generate karo, active devices monitor karo, aur block/unblock manage karo.</p>
 
   <div class="card">
     <label for="adminSecret">Admin Secret</label>
@@ -63,12 +65,20 @@
 
   <div class="card">
     <div class="row" style="justify-content:space-between; margin-bottom:14px;">
-      <strong>All Keys</strong>
+      <strong>All Keys & Device Status</strong>
       <button class="secondary" onclick="loadKeys()">↻ Refresh</button>
     </div>
     <table>
       <thead>
-        <tr><th>Key</th><th>Label</th><th>Reseller</th><th>Status</th><th>Devices</th><th>Today's usage</th><th>Action</th></tr>
+        <tr>
+          <th>Key</th>
+          <th>Label</th>
+          <th>Reseller</th>
+          <th>Status</th>
+          <th>Devices Used</th>
+          <th>Today's Usage</th>
+          <th>Action</th>
+        </tr>
       </thead>
       <tbody id="keysBody"></tbody>
     </table>
@@ -174,26 +184,41 @@ async function loadKeys() {
       return;
     }
     listMsg.textContent = '';
-    body.innerHTML = data.keys.map(k => `
-      <tr>
-        <td class="key-mono">${k.key}</td>
-        <td>${k.label || '—'}</td>
-        <td>${k.resellerId || '<span style="color:var(--muted)">Owner</span>'}</td>
-        <td>
-          <span class="badge ${k.blocked ? 'blocked' : 'active'}">${k.blocked ? 'Blocked' : 'Active'}</span>
-          ${k.flagged ? '<br><span class="badge blocked">⚠️ Flagged</span>' : ''}
-        </td>
-        <td>${k.deviceCount || 0} / ${k.maxDevices || 1}</td>
-        <td>${fmtSeconds(k.usedTodaySeconds)} / ${fmtSeconds(k.dailyLimitSeconds)}</td>
-        <td>
-          <button class="${k.blocked ? '' : 'danger'}" style="padding:6px 10px;font-size:12px"
-            onclick="toggleBlock('${k.key}', ${!k.blocked})">
-            ${k.blocked ? 'Unblock' : 'Block'}
-          </button>
-          <button class="danger" style="padding:6px 10px;font-size:12px;margin-left:4px" onclick="deleteKey('${k.key}')">Delete</button>
-        </td>
-      </tr>
-    `).join('');
+    body.innerHTML = data.keys.map(k => {
+      // ڈیوائسز کی لسٹ یا ڈیٹیلز ہینڈل کرنے کے لیے
+      let devicesHtml = `<strong>${k.deviceCount || 0}</strong> / ${k.maxDevices || 1}`;
+      
+      const devicesArr = k.devices || k.deviceList || k.connectedDevices;
+      if (Array.isArray(devicesArr) && devicesArr.length > 0) {
+        devicesHtml += `<div class="device-box">`;
+        devicesArr.forEach(dev => {
+          const devName = typeof dev === 'object' ? (dev.name || dev.deviceId || JSON.stringify(dev)) : dev;
+          devicesHtml += `<div class="device-item">💻 ${devName}</div>`;
+        });
+        devicesHtml += `</div>`;
+      }
+
+      return `
+        <tr>
+          <td class="key-mono">${k.key}</td>
+          <td>${k.label || '—'}</td>
+          <td>${k.resellerId || '<span style="color:var(--muted)">Owner</span>'}</td>
+          <td>
+            <span class="badge ${k.blocked ? 'blocked' : 'active'}">${k.blocked ? 'Blocked' : 'Active'}</span>
+            ${k.flagged ? '<br><span class="badge blocked">⚠️ Flagged</span>' : ''}
+          </td>
+          <td>${devicesHtml}</td>
+          <td>${fmtSeconds(k.usedTodaySeconds)} / ${fmtSeconds(k.dailyLimitSeconds)}</td>
+          <td>
+            <button class="${k.blocked ? '' : 'danger'}" style="padding:6px 10px;font-size:12px"
+              onclick="toggleBlock('${k.key}', ${!k.blocked})">
+              ${k.blocked ? 'Unblock' : 'Block'}
+            </button>
+            <button class="danger" style="padding:6px 10px;font-size:12px;margin-left:4px" onclick="deleteKey('${k.key}')">Delete</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
   } catch (e) {
     listMsg.className = 'msg error';
     listMsg.textContent = 'Network error';
@@ -298,7 +323,7 @@ async function loadResellers() {
     `).join('');
   } catch (e) {
     listMsg.className = 'msg error';
-    listMsg.textContent = 'Network error';
+    listMsg.textContent = 'Network error`';
   }
 }
 

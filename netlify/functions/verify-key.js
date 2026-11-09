@@ -37,9 +37,13 @@ exports.handler = async (event) => {
     const existing = record.devices.find(d => d.id === deviceId);
 
     if (!existing) {
+      // اگر ڈیوائس پہلے سے رجسٹرڈ نہیں ہے اور لمیٹ پوری ہو چکی ہے
       if (record.devices.length >= maxDevices) {
         record.flagged = true;
         record.extraDeviceAttempt = { deviceId, deviceModel, at: Date.now() };
+        await db.setJSON(key, record);
+        // یہاں ہم اسے صاف بلاک کر رہے ہیں تاکہ ایپ نہ چلے
+        return { statusCode: 200, body: JSON.stringify({ ok: false, reason: 'device_limit_exceeded' }) };
       } else {
         record.devices.push({ id: deviceId, model: deviceModel, firstSeen: Date.now(), location });
       }

@@ -24,7 +24,10 @@ exports.handler = async (event) => {
         remainingTodaySeconds: Math.max(0, record.dailyLimitSeconds - usedToday),
         createdAt: record.createdAt,
         maxDevices: record.maxDevices || 1,
-        deviceCount: (record.deviceIds || []).length,
+        devices: (record.devices || []).map(d => ({
+          model: d.model || 'Unknown',
+          location: d.location ? `${d.location.lat.toFixed(3)}, ${d.location.lng.toFixed(3)}` : 'Not shared',
+        })),
         flagged: !!record.flagged,
         resellerId: record.resellerId || null,
       };

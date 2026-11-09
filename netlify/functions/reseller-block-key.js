@@ -4,8 +4,9 @@ const { authenticateReseller } = require('./_reseller_store');
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method not allowed' };
 
-  const reseller = await authenticateReseller(event);
-  if (!reseller) return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) };
+  const auth = await authenticateReseller(event);
+  if (auth.error) return { statusCode: 401, body: JSON.stringify({ error: auth.error }) };
+  const reseller = auth.record;
 
   let body = {};
   try { body = JSON.parse(event.body || '{}'); } catch (e) {}

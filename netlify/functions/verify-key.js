@@ -12,6 +12,10 @@ exports.handler = async (event) => {
 
   const key = (body.key || '').toString().trim().toUpperCase();
   const deviceId = (body.deviceId || '').toString().trim().slice(0, 128);
+  const deviceModel = (body.deviceModel || 'Unknown device').toString().trim().slice(0, 80);
+  const location = body.location && typeof body.location === 'object'
+    ? { lat: Number(body.location.lat), lng: Number(body.location.lng), at: Date.now() }
+    : null;
 
   if (!key) {
     return { statusCode: 400, body: JSON.stringify({ ok: false, reason: 'Key required' }) };
@@ -27,19 +31,22 @@ exports.handler = async (event) => {
     return { statusCode: 200, body: JSON.stringify({ ok: false, reason: 'blocked' }) };
   }
 
-  // --- Device tracking ---
   if (deviceId) {
-    if (!record.deviceIds) record.deviceIds = [];
+    if (!record.devices) record.devices = [];
     const maxDevices = record.maxDevices || 1;
+    const existing = record.devices.find(d => d.id === deviceId);
 
-    if (!record.deviceIds.includes(deviceId)) {
-      if (record.deviceIds.length >= maxDevices) {
-        // Extra device: allow through, but flag for admin
+    if (!existing) {
+      if (record.devices.length >= maxDevices) {
         record.flagged = true;
-        record.extraDeviceAttempt = { deviceId, at: Date.now() };
+        record.extraDeviceAttempt = { deviceId, deviceModel, at: Date.now() };
       } else {
-        record.deviceIds.push(deviceId);
+        record.devices.push({ id: deviceId, model: deviceModel, firstSeen: Date.now(), location });
       }
+    } else {
+      existing.model = deviceModel;
+      existing.lastSeen = Date.now();
+      if (location) existing.location = location;
     }
   }
 
@@ -48,7 +55,7 @@ exports.handler = async (event) => {
   const remaining = record.dailyLimitSeconds - usageToday.secondsUsed;
 
   if (remaining <= 0) {
-    await db.setJSON(key, record); // save device tracking even if quota is over
+    await db.setJSON(key, record);
     return { statusCode: 200, body: JSON.stringify({ ok: false, reason: 'daily_limit_reached' }) };
   }
 

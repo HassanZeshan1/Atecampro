@@ -1,3 +1,4 @@
+const bcrypt = require('bcryptjs');
 const { resellerStore } = require('./_reseller_store');
 
 function randomResellerId() {
@@ -25,7 +26,12 @@ exports.handler = async (event) => {
   }
 
   const id = randomResellerId();
-  const record = { id, label, secret, blocked: false, createdAt: Date.now() };
+  const secretHash = await bcrypt.hash(secret, 10);
+  const record = {
+    id, label, secretHash,
+    blocked: false, createdAt: Date.now(),
+    failedAttempts: 0, lockedUntil: 0,
+  };
 
   const db = resellerStore();
   await db.setJSON(id, record);

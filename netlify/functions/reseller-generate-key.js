@@ -11,8 +11,9 @@ function randomKey() {
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method not allowed' };
 
-  const reseller = await authenticateReseller(event);
-  if (!reseller) return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) };
+  const auth = await authenticateReseller(event);
+  if (auth.error) return { statusCode: 401, body: JSON.stringify({ error: auth.error }) };
+  const reseller = auth.record;
 
   let body = {};
   try { body = JSON.parse(event.body || '{}'); } catch (e) {}
@@ -24,7 +25,7 @@ exports.handler = async (event) => {
   const key = randomKey();
   const record = {
     key, label, createdAt: Date.now(), blocked: false,
-    dailyLimitSeconds, maxDevices, deviceIds: [], flagged: false, usage: {},
+    dailyLimitSeconds, maxDevices, devices: [], flagged: false, usage: {},
     resellerId: reseller.id,
   };
 

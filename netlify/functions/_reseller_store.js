@@ -4,7 +4,7 @@ const { getStore } = require('@netlify/blobs');
 function resellerStore() {
   return getStore({
     name: 'resellers',
-    siteID: process.env.BLOBS_SITE_ID,
+    siteID: process.env.BLOE_ID,
     token: process.env.BLOBS_TOKEN,
   });
 }

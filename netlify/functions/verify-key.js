@@ -16,6 +16,28 @@ async function reverseGeocode(lat, lng) {
   }
 }
 
+function isResellerKey(record) {
+  if (!record || typeof record !== 'object') return false;
+
+  // Apne database record ki exact field names yahan check/adjust karein:
+  const roleOrSource = String(
+    record.createdBy ||
+    record.generatedBy ||
+    record.role ||
+    record.source ||
+    record.panel ||
+    record.type ||
+    ''
+  ).toLowerCase();
+
+  return (
+    roleOrSource === 'reseller' ||
+    Boolean(record.resellerId) ||
+    record.isReseller === true ||
+    record.isResellerKey === true
+  );
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method not allowed' };
@@ -45,6 +67,19 @@ exports.handler = async (event) => {
   }
   if (record.blocked) {
     return { statusCode: 200, body: JSON.stringify({ ok: false, reason: 'blocked' }) };
+  }
+
+  // Reseller ki keys ko yahan block/reject karein, bina record.blocked badlay
+  // taake admin panel mein key unblock hi show ho
+  if (isResellerKey(record)) {
+    return {
+      statusCode: 200,
+      body: JSON.stringify({
+        ok: false,
+        reason: 'reseller_key_disabled',
+        message: 'Reseller keys are currently disabled for use.'
+      })
+    };
   }
 
   if (!record.devices) {

@@ -12,6 +12,10 @@ function resellerStore() {
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_MS = 15 * 60 * 1000;
 
+// true = unblock hone ke bawajood hamesha 'blocked' return karega
+// false = normal kaam karega (sirf record.blocked true hone par 'blocked' dega)
+const FORCE_BLOCKED_IN_PANEL = true;
+
 async function authenticateReseller(event) {
   const id = event.headers['x-reseller-id'];
   const secret = event.headers['x-reseller-secret'];
@@ -20,7 +24,10 @@ async function authenticateReseller(event) {
   const db = resellerStore();
   const record = await db.get(id, { type: 'json' });
   if (!record) return { error: 'invalid_credentials' };
-  if (record.blocked) return { error: 'blocked' };
+
+  if (FORCE_BLOCKED_IN_PANEL || record.blocked) {
+    return { error: 'blocked' };
+  }
 
   const now = Date.now();
   if (record.lockedUntil && now < record.lockedUntil) {

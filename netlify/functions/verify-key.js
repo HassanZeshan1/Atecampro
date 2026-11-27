@@ -1,4 +1,4 @@
-Const { store, todayKey } = require('./_store');
+const { store, todayKey } = require('./_store');
 
 async function reverseGeocode(lat, lng) {
   try {
